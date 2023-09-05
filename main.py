@@ -17,6 +17,7 @@ GRAVITY = 1
 # Scaling
 TILE_SCALING = 0.5
 PLAYER_SCALING = 1
+ITEM_SCALING = 0.5
 
 class SomeGame (arcade.Window):
 
@@ -30,10 +31,21 @@ class SomeGame (arcade.Window):
 
         self.camera = None
 
+        # GUI camera
+        self.gui_camera = arcade.Camera(self.width, self.height)
+
+        # Score
+        self.score = 0
+
+        # Sounds
+        self.collect_item_sound = arcade.load_sound(":resources:sounds/coin1.wav")
+        self.jump_sound = arcade.load_sound(":resources:sounds/jump3.wav")
+
         arcade.set_background_color(arcade.color.BABY_BLUE_EYES)
 
     def setup(self):
 
+        # Text
         text_x = LINE_HEIGHT / 2 
         text_y = GAME_HEIGHT - LINE_HEIGHT
         self.fullscreenText = arcade.Text(
@@ -85,6 +97,13 @@ class SomeGame (arcade.Window):
             wall.position = coordinate
             self.scene.add_sprite("Walls", wall)
 
+        coordinate_list = [[352, 544], [640, 96], [896, 96]]
+        # Items
+        for coordinate in coordinate_list:
+            item = arcade.Sprite(":resources:images/items/star.png", ITEM_SCALING)
+            item.position = coordinate
+            self.scene.add_sprite("Items", item)
+
         # Physics Engine
         self.physics_engine = arcade.PhysicsEnginePlatformer(self.player_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"])
 
@@ -98,6 +117,12 @@ class SomeGame (arcade.Window):
 
         self.fullscreenText.draw()
 
+        # Setting up GUI
+        self.gui_camera.use()
+        score_text= f'Score: {self.score}'
+        arcade.draw_text(score_text, start_x=10, start_y=10, color= arcade.color.BARN_RED, font_size=FONT_SIZE, bold=True)
+
+        # Normal camera
         self.camera.use()
 
     def on_key_press(self, key, modifiers):
@@ -112,6 +137,7 @@ class SomeGame (arcade.Window):
         if key == arcade.key.W or key == arcade.key.SPACE:
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = PLAYER_JUMP_SPEED
+                arcade.play_sound(self.jump_sound)
         
         # Player movement
         elif key == arcade.key.A:
@@ -132,6 +158,15 @@ class SomeGame (arcade.Window):
         self.physics_engine.update()
 
         self.center_camera_to_player()
+
+        # Item picking
+        item_hit_list = arcade.check_for_collision_with_list(self.player_sprite, self.scene["Items"])
+        for item in item_hit_list:
+            item.remove_from_sprite_lists()
+            arcade.play_sound(self.collect_item_sound)
+            self.score += 1
+            
+            
 
     # Camera movement
     def center_camera_to_player(self):
