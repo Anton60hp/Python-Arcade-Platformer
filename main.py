@@ -41,13 +41,15 @@ class SomeGame (arcade.Window):
         self.collect_item_sound = arcade.load_sound(":resources:sounds/coin1.wav")
         self.jump_sound = arcade.load_sound(":resources:sounds/jump3.wav")
 
+        self.tile_map = None
+
         arcade.set_background_color(arcade.color.BABY_BLUE_EYES)
 
     def setup(self):
 
         # Text
-        text_x = LINE_HEIGHT / 2 
-        text_y = GAME_HEIGHT - LINE_HEIGHT
+        text_x = 288
+        text_y = LINE_HEIGHT / 2
         self.fullscreenText = arcade.Text(
             "Press F11 to togle fullscreen. Use WASD to move.",
             text_x,
@@ -57,15 +59,18 @@ class SomeGame (arcade.Window):
             width=GAME_WIDTH
         )
 
+        # Tile map
+        map_name = "Level_01.tmx"
+        layer_options = {
+            "Platforms": {
+                "use_spatial_hash": True,
+            }
+        }
+        self.tile_map = arcade.load_tilemap(map_name, TILE_SCALING, layer_options, )
+        self.scene = arcade.Scene.from_tilemap(self.tile_map)
+        
         # Camera
         self.camera = arcade.Camera(self.width, self.height)
-
-        # Scene
-        self.scene = arcade.Scene()
-        self.scene.add_sprite_list("Player")
-        self.scene.add_sprite_list("Walls", use_spatial_hash=True)
-        # self.wall_list = arcade.SpriteList()
-        # self.player_list = arcade.SpriteList(use_spatial_hash=True)
 
         # Character
         image_source = ":resources:images/animated_characters/robot/robot_idle.png"
@@ -75,37 +80,8 @@ class SomeGame (arcade.Window):
         self.scene.add_sprite("Player", self.player_sprite)
         # self.player_list.append(self.player_sprite)
 
-        # Ground
-        for x in range(0, 2048, 64):
-            wall = arcade.Sprite(":resources:images/tiles/stoneMid.png", TILE_SCALING)
-            wall.center_x = x
-            wall.center_y = 32
-            self.scene.add_sprite("Walls", wall)
-            # self.wall_list.append(wall)
-
-        # Chests
-        coordinate_list = [[768,96], [320,224], [384,224], [352,288]]
-
-        for x in range(256, 512, 64):
-            coordinate_list.append([x,96])
-            
-        for x in range (288, 480, 64):
-            coordinate_list.append([x,160])
-        
-        for coordinate in coordinate_list:
-            wall = arcade.Sprite(":resources:images/tiles/boxCrate_double.png", TILE_SCALING)
-            wall.position = coordinate
-            self.scene.add_sprite("Walls", wall)
-
-        coordinate_list = [[352, 544], [640, 96], [896, 96]]
-        # Items
-        for coordinate in coordinate_list:
-            item = arcade.Sprite(":resources:images/items/star.png", ITEM_SCALING)
-            item.position = coordinate
-            self.scene.add_sprite("Items", item)
-
         # Physics Engine
-        self.physics_engine = arcade.PhysicsEnginePlatformer(self.player_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"])
+        self.physics_engine = arcade.PhysicsEnginePlatformer(self.player_sprite, gravity_constant=GRAVITY, walls=self.scene["Platforms"])
 
     
 
