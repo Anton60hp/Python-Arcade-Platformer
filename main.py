@@ -6,9 +6,11 @@ import arcade
 GAME_WIDTH = 1600
 GAME_HEIGHT = 800
 GAME_TITLE = "Arcade Game"
+
 # Text constants
 LINE_HEIGHT = 40
 FONT_SIZE = 20
+
 # Player movement
 PLAYER_MS = 5
 PLAYER_JUMP_SPEED = 20
@@ -19,6 +21,21 @@ TILE_SCALING = 0.5
 PLAYER_SCALING = 1
 ITEM_SCALING = 0.5
 
+# Pixels
+SPRITE_PIXEL_SIZE = 128
+GRID_PIXEL_SIZE = SPRITE_PIXEL_SIZE * TILE_SCALING
+
+#Player starting position
+PLAYER_START_X = 64
+PLAYER_START_Y = 128
+
+# Layer names
+LAYER_NAME_PLATFORMS = "Platforms"
+LAYER_NAME_ITEMS = "Items"
+LAYER_NAME_FOREGROUND = "Foreground"
+LAYER_NAME_BACKGROUND = "Background"
+LAYER_NAME_DEATH_BOX = "Death Box"
+
 class SomeGame (arcade.Window):
 
     def __init__(self): 
@@ -26,8 +43,6 @@ class SomeGame (arcade.Window):
         super().__init__(GAME_WIDTH, GAME_HEIGHT, GAME_TITLE, fullscreen=False, center_window=True)
 
         self.scene = None
-        # self.wall_list = None
-        # self.player_list = None
 
         self.camera = None
 
@@ -37,13 +52,23 @@ class SomeGame (arcade.Window):
         # Score
         self.score = 0
 
-        # Sounds
-        self.collect_item_sound = arcade.load_sound(":resources:sounds/coin1.wav")
-        self.jump_sound = arcade.load_sound(":resources:sounds/jump3.wav")
+    
+
 
         self.tile_map = None
 
         arcade.set_background_color(arcade.color.BABY_BLUE_EYES)
+
+        self.end_of_map = 0
+
+        self.level = 1
+
+        self.reset_score = True
+
+        # Sounds
+        self.collect_item_sound = arcade.load_sound(":resources:sounds/coin1.wav")
+        self.jump_sound = arcade.load_sound(":resources:sounds/jump3.wav")
+        self.game_over = arcade.load_sound(":resources:sounds/gameover1.wav")
 
     def setup(self):
 
@@ -59,26 +84,42 @@ class SomeGame (arcade.Window):
             width=GAME_WIDTH
         )
 
-        # Tile map
-        map_name = "Level_01.tmx"
+        # Tile map options
+        map_name = f"Level_{self.level//10}{self.level%10}.tmx"
         layer_options = {
-            "Platforms": {
+            LAYER_NAME_PLATFORMS: {
+                "use_spatial_hash": True,
+            },
+            LAYER_NAME_ITEMS: {
+                "use_spatial_hash": True,
+            },
+            LAYER_NAME_DEATH_BOX: {
                 "use_spatial_hash": True,
             }
         }
-        self.tile_map = arcade.load_tilemap(map_name, TILE_SCALING, layer_options, )
+
+        self.tile_map = arcade.load_tilemap(map_name, TILE_SCALING, layer_options)
         self.scene = arcade.Scene.from_tilemap(self.tile_map)
+
+        # Score reset
+        if self.reset_score:
+            self.score = 0
+        self.reset_score = True
+
+        # Calculate end of the map
+        self.end_of_map = self.tile_map.width * GRID_PIXEL_SIZE
+
         
         # Camera
         self.camera = arcade.Camera(self.width, self.height)
 
         # Character
+        self.scene.add_sprite_list_before("Player", LAYER_NAME_FOREGROUND)
         image_source = ":resources:images/animated_characters/robot/robot_idle.png"
         self.player_sprite = arcade.Sprite(image_source, PLAYER_SCALING)
-        self.player_sprite.center_x = 64
-        self.player_sprite.center_y = 128
+        self.player_sprite.center_x = PLAYER_START_X
+        self.player_sprite.center_y = PLAYER_START_Y
         self.scene.add_sprite("Player", self.player_sprite)
-        # self.player_list.append(self.player_sprite)
 
         # Physics Engine
         self.physics_engine = arcade.PhysicsEnginePlatformer(self.player_sprite, gravity_constant=GRAVITY, walls=self.scene["Platforms"])
@@ -95,7 +136,7 @@ class SomeGame (arcade.Window):
 
         # Setting up GUI
         self.gui_camera.use()
-        score_text= f'Score: {self.score}'
+        score_text= f'Score: {self.score}. {len(self.scene.get_sprite_list("Items"))} more left to pickup.'
         arcade.draw_text(score_text, start_x=10, start_y=10, color= arcade.color.BARN_RED, font_size=FONT_SIZE, bold=True)
 
         # Normal camera
@@ -141,8 +182,26 @@ class SomeGame (arcade.Window):
             item.remove_from_sprite_lists()
             arcade.play_sound(self.collect_item_sound)
             self.score += 1
+        
+        # Fall off the map check
+        if self.player_sprite.center_y < -100:
+            self.player_sprite.center_x = PLAYER_START_X
+            self.player_sprite.center_y = PLAYER_START_Y
+
+        # Death box check
+        if arcade.check_for_collision_with_list(self.player_sprite, self.scene[LAYER_NAME_DEATH_BOX]):
+            self.player_sprite.change_x = 0
+            self.player_sprite.change_y = 0
+            self.player_sprite.center_x = PLAYER_START_X
+            self.player_sprite.center_y = PLAYER_START_Y
             
-            
+            arcade.play_sound(self.game_over)
+        
+        # End of the level check
+        if self.player_sprite.center_x >= self.end_of_map:
+            self.level += 1
+            self.reset_score = False
+            self.setup()    
 
     # Camera movement
     def center_camera_to_player(self):
@@ -154,6 +213,9 @@ class SomeGame (arcade.Window):
             screen_center_x = 0
         if screen_center_y < 0:
             screen_center_y = 0
+        
+        if screen_center_x > self.end_of_map - self.camera.viewport_width:
+            screen_center_x = self.end_of_map - self.camera.viewport_width
 
         player_centered = screen_center_x, screen_center_y
 
